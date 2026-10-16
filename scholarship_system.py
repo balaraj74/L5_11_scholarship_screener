@@ -6,9 +6,7 @@ extracurricular credits, and family income against defined threshold cutoffs.
 
 import ast
 import json
-import math
 import operator
-import sys
 from typing import Any, Dict, List, Optional
 
 results: Dict[str, Dict[str, Any]] = {}
@@ -109,7 +107,7 @@ def print_shortlist() -> None:
     """Displays all applicants shortlisted for scholarships."""
     print("Shortlisted applicants:")
     for student_id, details in results.items():
-        if details.get("eligible") == True:
+        if details.get("eligible"):
             print(f"  {student_id} score = {details.get(score)}")
 
 
