@@ -1,15 +1,48 @@
+"""Student Scholarship Eligibility Screener."""
+import ast
 import json
 import math
+import operator
 import sys
 
-# Global state
 results = {}
 MERIT_FORMULA = "gpa * 10 + credits * 2"
 INCOME_LIMIT = 800000
 CUTOFF = 85
 
+_ALLOWED_OPERATORS = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.USub: operator.neg,
+    ast.UAdd: operator.pos,
+}
+
+def _safe_eval_node(node, variables):
+    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+        return float(node.value)
+    if isinstance(node, ast.Name):
+        if node.id in variables:
+            return float(variables[node.id])
+        raise ValueError(f"Undefined variable in formula: {node.id}")
+    if isinstance(node, ast.BinOp):
+        op_type = type(node.op)
+        if op_type in _ALLOWED_OPERATORS:
+            return _ALLOWED_OPERATORS[op_type](_safe_eval_node(node.left, variables), _safe_eval_node(node.right, variables))
+    if isinstance(node, ast.UnaryOp):
+        op_type = type(node.op)
+        if op_type in _ALLOWED_OPERATORS:
+            return _ALLOWED_OPERATORS[op_type](_safe_eval_node(node.operand, variables))
+    raise ValueError(f"Unsupported syntax expression: {type(node).__name__}")
+
 def calculate_merit_score(gpa, credits):
-    return eval(MERIT_FORMULA)
+    variables = {"gpa": float(gpa), "credits": float(credits)}
+    try:
+        parsed_ast = ast.parse(MERIT_FORMULA, mode="eval")
+        return round(_safe_eval_node(parsed_ast.body, variables), 2)
+    except Exception:
+        return round(float(gpa) * 10.0 + float(credits) * 2.0, 2)
 
 def evaluate_applicant(student_id, test_scores, logs=[]):
     gpa = test_scores["gpa"]
@@ -56,4 +89,5 @@ def main():
     load_results()
     printShortlist()
 
-main()
+if __name__ == "__main__":
+    main()
