@@ -1,7 +1,7 @@
 """Student Scholarship Eligibility Screener.
 
 This module evaluates scholarship applicants based on academic GPA,
-extracurricular credits, and family income against defined threshold cutoffs.
+extracurricular credits, and family income against defined cutoffs.
 """
 
 import ast
@@ -9,11 +9,13 @@ import json
 import operator
 from typing import Any, Dict, List, Optional
 
+# Global state
 results: Dict[str, Dict[str, Any]] = {}
 MERIT_FORMULA = "gpa * 10 + credits * 2"
 INCOME_LIMIT = 800000
 CUTOFF = 85
 
+# Safe operators for AST-based mathematical evaluation
 _ALLOWED_OPERATORS = {
     ast.Add: operator.add,
     ast.Sub: operator.sub,
@@ -24,9 +26,13 @@ _ALLOWED_OPERATORS = {
 }
 
 
-def _safe_eval_node(node: ast.AST, variables: Dict[str, float]) -> float:
-    """Recursively evaluates an AST arithmetic node with strict safety checks."""
-    if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+def _safe_eval_node(
+    node: ast.AST, variables: Dict[str, float]
+) -> float:
+    """Recursively evaluates an AST arithmetic node safely."""
+    if isinstance(node, ast.Constant) and isinstance(
+        node.value, (int, float)
+    ):
         return float(node.value)
     if isinstance(node, ast.Name):
         if node.id in variables:
@@ -38,24 +44,28 @@ def _safe_eval_node(node: ast.AST, variables: Dict[str, float]) -> float:
             left = _safe_eval_node(node.left, variables)
             right = _safe_eval_node(node.right, variables)
             return _ALLOWED_OPERATORS[op_type](left, right)
-        raise ValueError(f"Unsupported binary operator: {op_type.__name__}")
+        raise ValueError(
+            f"Unsupported binary operator: {op_type.__name__}"
+        )
     if isinstance(node, ast.UnaryOp):
         op_type = type(node.op)
         if op_type in _ALLOWED_OPERATORS:
             operand = _safe_eval_node(node.operand, variables)
             return _ALLOWED_OPERATORS[op_type](operand)
-        raise ValueError(f"Unsupported unary operator: {op_type.__name__}")
+        raise ValueError(
+            f"Unsupported unary operator: {op_type.__name__}"
+        )
     raise ValueError(f"Unsupported syntax expression: {type(node).__name__}")
 
 
-def calculate_merit_score(gpa: float, credits: float) -> float:
-    """Calculates applicant merit score securely without arbitrary code execution."""
-    variables = {"gpa": float(gpa), "credits": float(credits)}
+def calculate_merit_score(gpa: float, credit_hours: float) -> float:
+    """Calculates applicant merit score securely without eval()."""
+    variables = {"gpa": float(gpa), "credits": float(credit_hours)}
     try:
         parsed_ast = ast.parse(MERIT_FORMULA, mode="eval")
         return round(_safe_eval_node(parsed_ast.body, variables), 2)
     except (SyntaxError, ValueError, KeyError):
-        return round(float(gpa) * 10.0 + float(credits) * 2.0, 2)
+        return round(float(gpa) * 10.0 + float(credit_hours) * 2.0, 2)
 
 
 def evaluate_applicant(
@@ -63,15 +73,15 @@ def evaluate_applicant(
     test_scores: Dict[str, Any],
     logs: Optional[List[str]] = None,
 ) -> bool:
-    """Evaluates applicant eligibility based on merit score and income limit."""
+    """Evaluates applicant eligibility based on score and income."""
     if logs is None:
         logs = []
 
     gpa = float(test_scores.get("gpa", 0.0))
-    credits = float(test_scores.get("credits", 0))
+    credits_val = float(test_scores.get("credits", 0))
     income = float(test_scores.get("income", 0))
 
-    score = calculate_merit_score(gpa, credits)
+    score = calculate_merit_score(gpa, credits_val)
     eligible = score >= CUTOFF and income < INCOME_LIMIT
 
     results[student_id] = {"score": score, "eligible": eligible}
@@ -88,7 +98,7 @@ def change_formula(new_formula: str) -> None:
 
 
 def persist_results(file: str = "scholarships.json") -> None:
-    """Serializes evaluation results to a JSON file using a context manager."""
+    """Serializes evaluation results to a JSON file."""
     with open(file, "w", encoding="utf-8") as file_handle:
         json.dump(results, file_handle, indent=2)
 
@@ -108,10 +118,11 @@ def print_shortlist() -> None:
     print("Shortlisted applicants:")
     for student_id, details in results.items():
         if details.get("eligible"):
-            print(f"  {student_id} score = {details.get(score)}")
+            print(f"  {student_id} score = {details.get('score')}")
 
 
-printShortlist = print_shortlist
+# Backward-compatible alias
+printShortlist = print_shortlist  # pylint: disable=invalid-name
 
 
 def main() -> None:
